@@ -8,4 +8,4 @@ variables:
 description: "Template for shipment use case."
 ---
 
-Hello {{ customer_name }}, your order (ID: {{ order_id }}) is confirmed for delivery on {{ delivery_date }}.
+Hello {{ customer_name }}, your order (ID: {{ order_id }}) is confirmed for delivery on {{ delivery_date }}. Important Update
