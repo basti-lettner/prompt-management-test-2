@@ -1,0 +1,96 @@
+name: Promote to Environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment (preview, staging, prod)'
+        required: true
+        type: choice
+        options:
+          - preview
+          - staging
+          - prod
+      customer:
+        description: 'Customer identifier (e.g., customer1, customer2)'
+        required: true
+        type: choice
+        options:
+          - customerA 
+          - customerB 
+          - customerC 
+      commit_sha:
+        description: 'Optional commit SHA to tag (defaults to latest commit)'
+        required: false
+        type: string
+        default: ''
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Target environment (preview, staging, prod)'
+        required: true
+        type: string
+      customer:
+        description: 'Customer identifier'
+        required: true
+        type: string
+      commit_sha:
+        description: 'Optional commit SHA to tag'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  create-tags:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}  # Using GITHUB_TOKEN for authentication
+          ref: customer/${{ inputs.customer }}
+
+      - name: Set commit SHA
+        id: set-commit
+        run: |
+          if [ -z "${{ inputs.commit_sha }}" ]; then
+            COMMIT_SHA=$(git rev-parse HEAD)
+          else
+            COMMIT_SHA="${{ inputs.commit_sha }}"
+          fi
+          SHORT_SHA=$(echo $COMMIT_SHA | cut -c1-7)
+          echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+
+      - name: Create and push tags
+        run: |
+          CUSTOMER="${{ inputs.customer }}"
+          ENV="${{ inputs.environment }}"
+          COMMIT_SHA="${{ steps.set-commit.outputs.commit_sha }}"
+          SHORT_SHA="${{ steps.set-commit.outputs.short_sha }}"
+          
+          # Create the latest tag
+          LATEST_TAG="${CUSTOMER}-${ENV}-latest"
+          git tag -f $LATEST_TAG $COMMIT_SHA
+          
+          # Create the short SHA tag
+          SHORT_SHA_TAG="${CUSTOMER}-${ENV}-${SHORT_SHA}"
+          git tag -f $SHORT_SHA_TAG $COMMIT_SHA
+          
+          # Push both tags to remote
+          git push origin $LATEST_TAG -f
+          git push origin $SHORT_SHA_TAG -f
+          
+          echo "Created and pushed tags: $LATEST_TAG and $SHORT_SHA_TAG for commit $COMMIT_SHA"
+
+      - name: Log promotion
+        run: |
+          echo "🚀 Promotion summary:"
+          echo "Customer: ${{ inputs.customer }}"
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Commit: ${{ steps.set-commit.outputs.commit_sha }}"
+          echo "Tags created: ${{ inputs.customer }}-${{ inputs.environment }}-latest and ${{ inputs.customer }}-${{ inputs.environment }}-${{ steps.set-commit.outputs.short_sha }}" 

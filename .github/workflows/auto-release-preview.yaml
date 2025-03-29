@@ -1,0 +1,38 @@
+name: Auto Release to Preview
+
+on:
+  push:
+    branches:
+      - 'customer/**'
+    paths-ignore:
+      - '.github/**'
+    tags-ignore:
+      - '**'
+
+
+jobs:
+  extract-customer-and-trigger:
+    runs-on: ubuntu-latest
+    outputs:
+      customer: ${{ steps.extract-customer.outputs.customer }}
+    steps:
+      - name: Extract customer name from branch
+        id: extract-customer
+        run: |
+          # Extract customer name from the branch name (e.g., customer/customerA -> customerA)
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          CUSTOMER_NAME=$(echo $BRANCH_NAME | cut -d'/' -f2)
+          echo "customer=$CUSTOMER_NAME" >> $GITHUB_OUTPUT
+          echo "Extracted customer: $CUSTOMER_NAME from branch $BRANCH_NAME"
+          echo "Debug - Customer name: $CUSTOMER_NAME"
+
+  call-promotion-workflow:
+    needs: extract-customer-and-trigger
+    uses: ./.github/workflows/promoto-to-env.yaml
+    with:
+      environment: preview
+      customer: ${{ needs.extract-customer-and-trigger.outputs.customer }}
+      commit_sha: ${{ github.sha }}
+    secrets: inherit
+    permissions:
+      contents: write
